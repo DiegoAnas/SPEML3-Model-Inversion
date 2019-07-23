@@ -4,14 +4,15 @@ To install Theano use:
 
 Otherwise it will install <1.0.4 and it has issues with NUMPY
 
-For pylearn you have to download it, install it, and change every 
+For pylearn2 you have to download it, install it (w setup.py), and change every 
 `from theano.compat import six`
 
-to just (also install six)`import six`
+to just `import six` (also install six). Don't use Conda
 
 Todo: 
   * Understand what TensorFlow is doing
   * Understand why ZCA and GCA are used for preprocess
+ 
 If it works, which I guess it should:
   * Add other models like in the original paper
   * Add some image manipulation operations like it mentions in the paper (but they don't implement??)
