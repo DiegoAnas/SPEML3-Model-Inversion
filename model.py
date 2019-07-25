@@ -31,8 +31,12 @@ class Model:
 
     def train(self, train_x, train_y, session, test_x, test_y, num_iters, disp_freq=50):
         for i in range(num_iters):
-            feed_dict = {self.x: train_x, self.y_: train_y}
+            feed_dict = {self.x: train_x, self.y: train_y}
             session.run(self.train_step, feed_dict)
+            #fails here ^
+     #        tensorflow.python.framework.errors_impl.InvalidArgumentError: You must feed a value for placeholder tensor 'Placeholder_1' with dtype float and shape [?,40]
+	 # [[node Placeholder_1 (defined at /PycharmProjects/SPEML3-Model-Inversion/inversion.py:47) ]]
+
             if (i % disp_freq == 0):
                 train_acc = self.test(train_x, train_y, session)
                 test_acc = self.test(test_x, test_y, session)
@@ -41,7 +45,7 @@ class Model:
         stdout.write("\n")
 
     def test(self, test_x, test_y, session):
-        return (session.run(self.accuracy, feed_dict={self.x: test_x, self.y_: test_y}))
+        return (session.run(self.accuracy, feed_dict={self.x: test_x, self.y: test_y}))
 
     def invert(self, session, num_iters, lam, img, pre_process, pred_cutoff=0.99, disp_freq=1):
 
@@ -56,7 +60,7 @@ class Model:
         prev_losses = [100000.0] * 100
 
         for i in range(num_iters):
-            feed_dict = {self.x: [current_X], self.y_: Y}
+            feed_dict = {self.x: [current_X], self.y: Y}
             der, current_loss = session.run([self.grads, self.loss], feed_dict)
             current_X = np.clip(current_X - lam * (der[0][0]), 0.0, 1.0)
             current_X = normalize(current_X, pre_process, current_X.shape)

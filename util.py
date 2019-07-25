@@ -42,7 +42,7 @@ def one_hot_class(a):
     return b
 
 
-def unpack_facedataset(path='/home/yash/Documents/Attacks/Guillaume-Freisz-project/orl_faces'
+def unpack_facedataset(path='./faces/att_faces/'
                        , sz=None):
     """Reads the images in a given folder, resizes images on the fly if size is given.
 
