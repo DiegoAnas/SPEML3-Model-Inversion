@@ -4,6 +4,10 @@ import os
 import sys
 from PIL import Image
 from pylearn2.expr.preprocessing import global_contrast_normalize
+try:
+    import cPickle as pickle
+except ModuleNotFoundError:
+    import pickle
 
 import matplotlib.pyplot as plt
 
@@ -91,6 +95,7 @@ def unpack_facedataset(path='./faces/att_faces/'
 
 
 def normalize(img, prep, img_shape):
+    # this requires zca from pylearn 2 for all functions prep.
     img = prep.inverse(img.reshape(1, -1))[0]
     img /= np.abs(img).max()
     img = np.clip(img, -1., 1.)
@@ -99,11 +104,39 @@ def normalize(img, prep, img_shape):
     img = prep._gpu_matrix_dot(img - prep.mean_, prep.P_)
     return img.reshape(img_shape)
 
-
 def post_process(img, prep, img_shape):
     # normalize without contrast_normalize and mean_subtract
+    # this requires zca from pylearn 2 for all functions prep.
     img = prep.inverse(img.reshape(1, -1))[0]
     img /= np.abs(img).max()
     img = np.clip(img, -1., 1.)
     img = (img + 1.) / 2.
     return img.reshape(img_shape)
+
+def perform_inversion(pre_process, images, model, session):
+    for img in images:
+        face_imshow(img)
+        plt.title('Image-Class used for inversion.')
+        plt.show()
+        print('Predictions: ' + str((model.preds(img, session))))
+
+        inv_img_last, inv_img_last_p, inv_img_best, inv_img_best_p = model.invert(session, 100, 0.1, img,
+                                                                                  pre_process= pre_process)
+
+        face_imshow(inv_img_best)
+        plt.title('Best Image after inversion.')
+        plt.show()
+        print('Predictions: ' + str(inv_img_best_p))
+
+        face_imshow(inv_img_last)
+        plt.title('Last Iteration Image after inversion.')
+        plt.show()
+        print('Predictions: ' + str(inv_img_last_p))
+
+def load(file_name):
+    with open(file_name, 'rb') as pickle_file:
+        return pickle.load(pickle_file)
+
+def save(file_name, data):
+    with open(file_name, 'wb') as f:
+        pickle.dump(data, f)

@@ -12,7 +12,5 @@ to just `import six` (also install six). Don't use Conda
 Todo: 
   * Understand what TensorFlow is doing
   * Understand why ZCA and GCA are used for preprocess
- 
-If it works, which I guess it should:
   * Add other models like in the original paper
   * Add some image manipulation operations like it mentions in the paper (but they don't implement??)
