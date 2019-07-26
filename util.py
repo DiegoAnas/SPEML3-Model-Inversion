@@ -88,9 +88,10 @@ def unpack_facedataset(path='./DATA/att_faces/orl_faces'
 
     train_x, test_x = X[:, 0:7, :], X[:, 7:10, :]
     train_y, test_y = y[:, 0:7], y[:, 7:10]
-    train_x, test_x, train_y, test_y = train_x.reshape(40 * 7, 112 * 92), test_x.reshape(40 * 3,
-                                                                                         112 * 92), train_y.reshape(
-        40 * 7), test_y.reshape(40 * 3)
+    train_x, test_x, train_y, test_y = train_x.reshape(40 * 7, 112 * 92),\
+                                       test_x.reshape(40 * 3,112 * 92),\
+                                       train_y.reshape(40 * 7),\
+                                       test_y.reshape(40 * 3)
 
     return train_x, test_x, one_hot_class(train_y), one_hot_class(test_y)
 
