@@ -25,7 +25,7 @@ class Model:
         # Gradient descent
         self.grads = tf.gradients(self.cross_entropy, x)
 
-        self.train_step = tf.train.GradientDescentOptimizer(0.1).minimize(self.cross_entropy)
+        self.train_step = tf.compat.v1.train.GradientDescentOptimizer(0.1).minimize(self.cross_entropy)
 
         # performance metrics
         correct_prediction = tf.equal(tf.argmax(self.y, 1), tf.argmax(y_, 1))
@@ -98,10 +98,10 @@ class Model:
         best_X = post_process(best_X, pre_process, best_X.shape)
         return current_X, current_preds, best_X, best_preds
 
-    def preds(self, img, session):  # what does this do?
+    def preds(self, img, session):
         """
-        :param img:
-        :param session:
-        :return:
+        :param img: image to get probabilities to which class it belongs
+        :param session: tensorFlow session
+        :return: array of probabilities
         """
         return session.run(self.probabilities, feed_dict={self.x: [img]})
