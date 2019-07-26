@@ -25,7 +25,7 @@ class Model:
         # Gradient descent
         self.grads = tf.gradients(self.cross_entropy, x)
 
-        self.train_step = tf.train.GradientDescentOptimizer(0.1).minimize(self.cross_entropy)
+        self.train_step = tf.compat.v1.train.GradientDescentOptimizer(0.1).minimize(self.cross_entropy)
 
         # performance metrics
         correct_prediction = tf.equal(tf.argmax(self.y, 1), tf.argmax(y_, 1))

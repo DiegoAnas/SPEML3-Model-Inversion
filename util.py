@@ -13,7 +13,7 @@ import matplotlib.pyplot as plt
 
 
 def weight_variable(shape):
-    initial = tf.truncated_normal(shape=shape, stddev=0.1)
+    initial = tf.random.truncated_normal(shape=shape, stddev=0.1)
     return tf.Variable(initial)
 
 
@@ -68,6 +68,7 @@ def unpack_facedataset(path='./DATA/att_faces/orl_faces'
             for filename in os.listdir(subject_path):
                 try:
                     im = Image.open(os.path.join(subject_path, filename))
+                    # Convert to grayscale (Floyed-SteinBerg-dithering)
                     im = im.convert("L")
                     # resize to given size (if given)
                     if (sz is not None):

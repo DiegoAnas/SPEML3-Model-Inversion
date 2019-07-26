@@ -22,11 +22,11 @@ if __name__ == "__main__":
         zca.fit(train_x_normalized)
         save("faces/zca.data", zca)
 
-    x = tf.placeholder(tf.float32, shape=[None, 112*92])
-    y_ = tf.placeholder(tf.float32, shape=[None, 40])
+    x = tf.compat.v1.placeholder(tf.float32, shape=[None, 112*92])
+    y_ = tf.compat.v1.placeholder(tf.float32, shape=[None, 40])
     model = Model(x,y_)
-    session = tf.InteractiveSession()
-    session.run(tf.global_variables_initializer())
+    session = tf.compat.v1.InteractiveSession()
+    session.run(tf.compat.v1.global_variables_initializer())
     #print(f"test {test_y.shape} t: {type(test_y)} ; train {train_y.shape} t: {type(train_y)}")
     model.train(train_x, train_y, session, test_x, test_y, 250)
 
