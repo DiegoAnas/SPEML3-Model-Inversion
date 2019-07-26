@@ -98,10 +98,10 @@ class Model:
         best_X = post_process(best_X, pre_process, best_X.shape)
         return current_X, current_preds, best_X, best_preds
 
-    def preds(self, img, session):  # what does this do?
+    def preds(self, img, session):
         """
-        :param img:
-        :param session:
-        :return:
+        :param img: image to get probabilities to which class it belongs
+        :param session: tensorFlow session
+        :return: array of probabilities
         """
         return session.run(self.probabilities, feed_dict={self.x: [img]})
