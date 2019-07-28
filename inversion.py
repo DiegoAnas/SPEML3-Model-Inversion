@@ -27,8 +27,7 @@ if __name__ == "__main__":
     model = Model(x,y_)
     session = tf.compat.v1.InteractiveSession()
     session.run(tf.compat.v1.global_variables_initializer())
-    #print(f"test {test_y.shape} t: {type(test_y)} ; train {train_y.shape} t: {type(train_y)}")
     model.train(train_x, train_y, session, test_x, test_y, 250)
 
     perform_inversion(zca, test_x[0::3], model, session)
-    # perform_inversion(train_x, test_x[0::3], model, session)
+    # stride 3 sicne there are 3 faces per ecah class in test set

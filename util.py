@@ -13,6 +13,7 @@ import matplotlib.pyplot as plt
 
 
 def weight_variable(shape):
+    # Outputs random values from a truncated normal distribution.
     initial = tf.random.truncated_normal(shape=shape, stddev=0.1)
     return tf.Variable(initial)
 
