@@ -2,8 +2,9 @@ import tensorflow as tf
 import numpy as np
 import os
 import sys
-from PIL import Image
+from PIL import Image, ImageOps, ImageFilter
 from pylearn2.expr.preprocessing import global_contrast_normalize
+from keras import backend as K
 try:
     import cPickle as pickle
 except ModuleNotFoundError:
@@ -99,18 +100,29 @@ def unpack_facedataset(path='./DATA/att_faces/orl_faces'
 
 def normalize(img, prep, img_shape):
     # this requires zca from pylearn 2 for all functions prep.
-    img = prep.inverse(img.reshape(1, -1))[0]
+    # img = prep.inverse(img.reshape(1, -1))[0]
+
+    imgarr = np.zeros((1, 1, 112, 92), dtype='float32')
+    imgarr[0][0] = img.reshape(112, 92)
+    img = prep.flow(imgarr, batch_size=1)
+    img = img[0]
+
     img /= np.abs(img).max()
     img = np.clip(img, -1., 1.)
     img = (img + 1.) / 2.
+
     img = global_contrast_normalize(img.reshape(1, -1) * 255, scale=55.)
-    img = prep._gpu_matrix_dot(img - prep.mean_, prep.P_)
+    # img = prep._gpu_matrix_dot(img - prep.mean_, prep.P_)
     return img.reshape(img_shape)
 
 def post_process(img, prep, img_shape):
     # normalize without contrast_normalize and mean_subtract
     # this requires zca from pylearn 2 for all functions prep.
-    img = prep.inverse(img.reshape(1, -1))[0]
+    # img = prep.inverse(img.reshape(1, -1))[0]
+    imgarr = np.zeros((1, 1, 112, 92), dtype='float32')
+    imgarr[0][0] = img.reshape(112, 92)
+    img = prep.flow(imgarr)[0]
+
     img /= np.abs(img).max()
     img = np.clip(img, -1., 1.)
     img = (img + 1.) / 2.
@@ -123,7 +135,7 @@ def perform_inversion(pre_process, images, model, session):
         plt.show()
         print('Predictions: ' + str((model.preds(img, session))))
 
-        inv_img_last, inv_img_last_p, inv_img_best, inv_img_best_p = model.invert(session, 100, 0.1, img,
+        inv_img_last, inv_img_last_p, inv_img_best, inv_img_best_p = model.invert(session, 5000, 0.1, img,
                                                                                   pre_process= pre_process)
 
         face_imshow(inv_img_best)
@@ -136,10 +148,70 @@ def perform_inversion(pre_process, images, model, session):
         plt.show()
         print('Predictions: ' + str(inv_img_last_p))
 
+
 def load(file_name):
     with open(file_name, 'rb') as pickle_file:
         return pickle.load(pickle_file)
 
+
 def save(file_name, data):
     with open(file_name, 'wb') as f:
         pickle.dump(data, f)
+
+
+def identity(img_array):
+    """
+    Test function
+    :param img_array:
+    :return: same array after converting it to PIL Image
+    """
+    pil_img = Image.fromarray((img_array * 255).astype('uint8'), mode='L')
+    new_array = np.array(pil_img)
+    return new_array
+
+
+def equalize(img_array):
+    """
+    :param img_array: a 2D numpy array
+    :return: numpy array after applying histogram equalization
+    """
+    pil_img = Image.fromarray((img_array * 255).astype('uint8'), mode='L')
+    pil_img = ImageOps.equalize(pil_img)
+    return np.array(pil_img)
+
+
+def filter(img_array, filter:ImageFilter):
+    pil_img = Image.fromarray((img_array * 255).astype('uint8'), mode='L')
+    pil_img = pil_img.filter(filter)
+    return np.array(pil_img)
+
+
+def gaussianBlur(img_array, radius:float=2):
+    """
+    :param img_array: a 2D numpy array
+    :param radius: Blur radius
+    :return: numpy array after applying a blur filter
+    """
+    pil_img = Image.fromarray((img_array * 255).astype('uint8'), mode='L')
+    pil_img = pil_img.filter(ImageFilter.GaussianBlur(radius))
+    return np.array(pil_img)
+
+
+def medFilter(img_array: np.array, size: int = 3) -> np.array:
+    """
+    :param img_array: a 2D numpy array
+    :param size: window size
+    :return: numpy array after applying a median filter
+    """
+    pil_img = Image.fromarray((img_array * 255).astype('uint8'), mode='L')
+    pil_img = pil_img.filter(ImageFilter.MedianFilter(size))
+    return np.array(pil_img)
+
+
+def sharpenFilter(img_array):
+    pil_img = Image.fromarray((img_array * 255).astype('uint8'), mode='L')
+    pil_img = pil_img.filter(ImageFilter.SHARPEN)
+    return np.array(pil_img)
+
+
+

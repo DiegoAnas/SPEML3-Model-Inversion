@@ -4,6 +4,7 @@ from util import *
 
 class Model:
     def __init__(self, x, y_):
+        # Softmax regression
         in_dim = int(x.get_shape()[1])  # 10304 for Face dataset
         out_dim = int(y_.get_shape()[1])  # 40 for Face dataset
         self.x = x
@@ -16,11 +17,11 @@ class Model:
 
         # softmax activated output layer
         self.probabilities = tf.nn.softmax(self.y)
-        self.class_inds = tf.argmax(self.probabilities, 1)  # class indices????
+        self.class_inds = tf.argmax(self.probabilities, 1)  # class indices
 
         # cross_entropy
         self.cross_entropy = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits_v2(labels=y_, logits=self.y))
-        # Measures the probability error in discrete classification tasks in which the classes are mutually exclusive
+            # Measures the probability error in discrete classification tasks in which the classes are mutually exclusive
 
         class_ind_correct = tf.argmax(y_, 1)
         self.class_prob = (self.probabilities[0, tf.cast(class_ind_correct[0], tf.int32)])
@@ -60,7 +61,7 @@ class Model:
     def test(self, test_x, test_y, session):
         return (session.run(self.accuracy, feed_dict={self.x: test_x, self.y_: test_y}))
 
-    def invert(self, session, num_iters, lam, img, pre_process, pred_cutoff=0.99, disp_freq=50):
+    def invert(self, session, num_iters, lam, img, pre_process, pred_cutoff=0.9999, disp_freq=50):
         """
         :param session: tf.session
         :param num_iters: alpha parameter, iterations to apply GD. 5000 in papaer
@@ -72,12 +73,10 @@ class Model:
         :return:
         """
 
-        probabilities = self.preds(img, session) # [1][40] float
-        # replace it w:?
-        # probabilities = session.run(self.probabilities, feed_dict={self.x: [img]})
-        class_ind = session.run(self.class_inds, feed_dict={self.x: [img]})[0] # class ind = 0 ¿this is the class we are inverting?
+        # probabilities = self.preds(img, session) # [1][40] float
+        probabilities = session.run(self.probabilities, feed_dict={self.x: [img]}) # [1][40] float
+        class_ind = session.run(self.class_inds, feed_dict={self.x: [img]})[0] # this is the class we are inverting
         current_X = np.zeros(list(img.shape)[0]).astype(np.float32) # 10304 (pixel count)
-        # current_x shape
         Y = (one_hot_preds(probabilities)).astype(np.float32) # [40] in {0,1}
         best_X = np.copy(current_X)
         best_loss = 100000.0
@@ -86,14 +85,29 @@ class Model:
         for i in range(num_iters):
             feed_dict = {self.x: [current_X], self.y_: Y}
             der, current_loss = session.run([self.grads, self.loss], feed_dict)
+            # todo loss= 0, fix that
             # der:List[ndarray] size = 10304
 
             # image manipulation
             current_X = np.clip(current_X - lam * (der[0][0]), 0.0, 1.0)
             #                   x_i - lambda * gradient(x_i)
             #   why der[0][0] ?? why not each pixel its corresponding gradient????
-            current_X = normalize(current_X, pre_process, current_X.shape)
-            probabilities = self.preds(current_X, session)[0]
+            # len(der[0][0])=10304, that's why
+            # current_X = normalize(current_X, pre_process, current_X.shape)
+            # todo
+            # current_X = equalize(np.reshape(current_X, (112, 92)))
+            # current_X = sharpenFilter(current_X)
+            # current_X = np.ndarray.flatten(current_X)
+
+            probabilities = session.run(self.probabilities, feed_dict={self.x: [img]})[0]
+
+            if i % 50 == 49:
+                # todo every how many iterations?
+                # todo randomly? apply sharpening and gaussian filters, edge filters?
+                # current_X = sharpenFilter(np.reshape(current_X, (112, 92)))
+                current_X = gaussianBlur(np.reshape(current_X, (112, 92)), 4)
+                current_X = equalize(current_X)
+                current_X = np.ndarray.flatten(current_X)
 
             if current_loss < best_loss:
                 best_loss = current_loss
@@ -104,14 +118,16 @@ class Model:
                 break
 
             if pred_cutoff < probabilities[class_ind]:
-                print("\n Above Probability Criteria!: {0}".format(probabilities[class_ind]))
+                print(f"\n Above Probability Criteria!: {probabilities[class_ind]}")
+                print(f"\n After {i} iterations")
+                print(f"\n {probabilities}")
                 break
 
             if i % disp_freq == 0:
                 #                 plt.close()
                 #                 face_imshow(post_process(current_X, pre_process, current_X.shape))
                 #                 plt.show()
-                stdout.write("\r Acc: %f and Loss: %f and Best Loss: %f" % (probabilities[class_ind], current_loss, best_loss))
+                stdout.write(f"\r Acc: {probabilities[class_ind]} and Loss: {current_loss} and Best Loss: {best_loss}")
                 stdout.flush()
 
         stdout.write("\n")
@@ -123,6 +139,7 @@ class Model:
         best_X = post_process(best_X, pre_process, best_X.shape)
         return current_X, current_preds, best_X, best_preds
 
+    # todo remove
     def preds(self, img, session):
         """
         :param img: image to get probabilities to which class it belongs
