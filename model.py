@@ -33,27 +33,27 @@ class Model:
             self.tf_test_dataset = tf.constant(test_data)
 
             # Variables.
-            weights = tf.Variable(tf.random.truncated_normal([num_features, num_labels]))
+            weights = tf.Variable(tf.random.truncated_normal([num_features, num_labels], stddev=0.1))
             # biases = tf.Variable(tf.zeros([num_labels]))
             biases = tf.Variable(tf.constant(0.1, shape=[num_labels]))
             # Output layer  / Training computation. Logits = raw predictions (wo softmax
             logits = tf.matmul(self.tf_train_dataset, weights) + biases
             # loss = cross-entropy
             self.cross_entropy = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits_v2(labels = self.tf_train_labels, logits=logits))
+            # Gradient descent
+            self.grads = tf.gradients(self.cross_entropy, self.tf_train_dataset)
             # Optimizer.
             self.optimizer = tf.compat.v1.train.GradientDescentOptimizer(learning_rate).minimize(self.cross_entropy)
 
             # Predictions for the training, and test data.
-            self.train_prediction = tf.nn.softmax(logits)
+            self.probabilities = tf.nn.softmax(logits)
             self.test_prediction = tf.nn.softmax(tf.matmul(self.tf_test_dataset, weights) + biases)
 
-            self.class_inds = tf.argmax(self.train_prediction, 1)  # class predicted
+            self.class_inds = tf.argmax(self.probabilities, 1)  # class predicted
             class_ind_correct = tf.argmax(self.tf_train_labels, 1)  # true class
-            self.class_prob = (self.train_prediction[0, tf.cast(class_ind_correct[0], tf.int32)])  # Prob predicted of the true class
+            self.class_prob = (self.probabilities[0, tf.cast(class_ind_correct[0], tf.int32)])  # Prob predicted of the true class
             self.loss = tf.subtract(tf.constant(1.0), self.class_prob)  # loss is 1 - prob of true class
             ###
-
-
 
             # Output predictions
             self.predictions = tf.argmax(logits, 1)
@@ -109,7 +109,7 @@ class Model:
                          self.tf_train_labels: batch_labels}
 
             # run one step of computation
-            _, l, predictions = self.session.run([self.optimizer, self.cross_entropy, self.train_prediction],
+            _, l, predictions = self.session.run([self.optimizer, self.cross_entropy, self.probabilities],
                                             feed_dict=feed_dict)
 
             if (step % disp_freq == 0):
@@ -123,7 +123,54 @@ class Model:
         print(f"\nTest accuracy: {self.test(self.test_dataset, self.test_labels):.3f}")
 
 
-    def invert(self, session, num_iters, lam, img, pre_process, pred_cutoff=0.9999, disp_freq=50):
+    def invert(self, person_class, filters=[], equalize=False, lambda_=0.1, iterations=1000, disp_freq=100, pred_cutoff=0.9):
+        # current_X = np.zeros(list([10304])[0]).astype(np.float32)  # 10304 (pixel count)
+        current_X = np.random.rand(10304).astype(np.float32)  # 10304 (pixel count)
+        Y = np.zeros([40])  # [40] in {0,1}
+        Y[person_class] = 1
+        best_X = np.copy(current_X)
+        best_loss = 100000.0
+        prev_losses = [100000.0] * 100
+        for i in range(iterations):
+            feed_dict = {self.tf_train_dataset: [current_X], self.tf_train_labels: [Y]}
+            gradients, current_loss = self.session.run([self.grads, self.loss], feed_dict)
+            # der:List[ndarray] size = 10304
+
+            current_X = np.clip(current_X - lambda_ * (gradients[0][0]), 0.0, 1.0)
+            #                   x_i - lambda * gradient(x_i)
+            if len(filters) > 0:
+                current_X = np.reshape(current_X, (112, 92))
+                for filter in filters:
+                    current_X = applyFilter(current_X, filter)
+                if equalize:
+                    current_X = applyEqualization(current_X)
+                current_X = np.ndarray.flatten(current_X)
+
+            probabilities = self.session.run(self.probabilities, feed_dict={self.tf_train_dataset: [current_X]})[0]
+            if current_loss < best_loss:
+                best_loss = current_loss
+                best_X = current_X
+            if current_loss > 2 * max(prev_losses):
+                print("\n Breaking due to gradient chaos!!")
+                break
+            # if probabilities[person_class] > pred_cutoff and current_loss < 1-pred_cutoff:
+            #     print(f"\n Above Probability Criteria!: {probabilities[person_class]}")
+            #     print(f"\n After {i} iterations w loss {current_loss}")
+            #     print(f"\n {probabilities}")
+            #     break
+
+            if i % disp_freq == 0:
+                stdout.write(f"\r Acc: {probabilities[person_class]} and Loss: {current_loss} and Best Loss: {best_loss}")
+                stdout.flush()
+        stdout.write("\n")
+        print('Loop Escape.')
+        current_preds = self.session.run(self.probabilities, feed_dict={self.tf_train_dataset: [current_X]})
+        best_preds = self.session.run(self.probabilities, feed_dict={self.tf_train_dataset: [best_X]})
+        # current_X = post_process(current_X, pre_process, current_X.shape)
+        # best_X = post_process(best_X, pre_process, best_X.shape)
+        return current_X, current_preds, best_X, best_preds
+
+    def invert2(self, session, num_iters, lam, img, pre_process, pred_cutoff=0.9999, disp_freq=50):
         """
         :param session: tf.session
         :param num_iters: alpha parameter, iterations to apply GD. 5000 in papaer
@@ -136,8 +183,8 @@ class Model:
         """
 
         # probabilities = self.preds(img, session) # [1][40] float
-        probabilities = session.run(self.probabilities, feed_dict={self.x: [img]}) # [1][40] float
-        class_ind = session.run(self.class_inds, feed_dict={self.x: [img]})[0] # this is the class we are inverting
+        probabilities = session.run(self.probabilities, feed_dict={self.tf_train_dataset: [img]}) # [1][40] float
+        class_ind = session.run(self.class_inds, feed_dict={self.tf_train_dataset: [img]})[0] # this is the class we are inverting
         current_X = np.zeros(list(img.shape)[0]).astype(np.float32) # 10304 (pixel count)
         Y = (one_hot_preds(probabilities)).astype(np.float32) # [40] in {0,1}
         best_X = np.copy(current_X)
@@ -145,7 +192,7 @@ class Model:
         prev_losses = [100000.0] * 100
 
         for i in range(num_iters):
-            feed_dict = {self.x: [current_X], self.y_: Y}
+            feed_dict = {self.tf_train_dataset: [current_X], self.tf_train_labels: Y}
             der, current_loss = session.run([self.grads, self.loss], feed_dict)
             # todo loss= 0, fix that
             # der:List[ndarray] size = 10304
@@ -161,7 +208,7 @@ class Model:
             # current_X = sharpenFilter(current_X)
             # current_X = np.ndarray.flatten(current_X)
 
-            probabilities = session.run(self.probabilities, feed_dict={self.x: [img]})[0]
+            probabilities = session.run(self.probabilities, feed_dict={self.tf_train_dataset: [img]})[0]
 
             if i % 50 == 49:
                 # todo every how many iterations?
@@ -195,8 +242,8 @@ class Model:
         stdout.write("\n")
         print('Loop Escape.')
 
-        current_preds = session.run(self.probabilities, feed_dict={self.x: [current_X]})
-        best_preds = session.run(self.probabilities, feed_dict={self.x: [best_X]})
+        current_preds = session.run(self.probabilities, feed_dict={self.tf_train_dataset: [current_X]})
+        best_preds = session.run(self.probabilities, feed_dict={self.tf_train_dataset: [best_X]})
         current_X = post_process(current_X, pre_process, current_X.shape)
         best_X = post_process(best_X, pre_process, best_X.shape)
         return current_X, current_preds, best_X, best_preds

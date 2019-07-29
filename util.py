@@ -128,7 +128,38 @@ def post_process(img, prep, img_shape):
     img = (img + 1.) / 2.
     return img.reshape(img_shape)
 
-def perform_inversion(pre_process, images, model, session):
+
+def perform_inversion(model, person_class, option:int, equalize:bool=False):
+    filters = []
+    if option == 1:
+        filters.append(ImageFilter.MedianFilter(3))
+        filters.append(ImageFilter.SHARPEN)
+    if option == 2:
+        filters.append(ImageFilter.BLUR)
+        filters.append(ImageFilter.SHARPEN)
+    if option == 3:
+        filters.append(ImageFilter.GaussianBlur(5))
+    if option == 4:
+        filters.append(ImageFilter.SHARPEN)
+    if option == 6:
+        filters.append(ImageFilter.SHARPEN)
+        filters.append(ImageFilter.GaussianBlur(2))
+    if option == 5:
+        filters.append(ImageFilter.DETAIL)
+    inv_img_last, inv_img_last_p, inv_img_best, inv_img_best_p = model.invert(person_class, filters, equalize)
+
+    face_imshow(inv_img_best)
+    plt.title('Best Image after inversion.')
+    plt.show()
+    print('Best Predictions: ' + str(inv_img_best_p))
+
+    face_imshow(inv_img_last)
+    plt.title('Last Iteration Image after inversion.')
+    plt.show()
+    print('Last Predictions: ' + str(inv_img_last_p))
+
+
+def perform_inversion2(pre_process, images, model, session):
     for img in images:
         face_imshow(img)
         plt.title('Image-Class used for inversion.')
@@ -141,12 +172,12 @@ def perform_inversion(pre_process, images, model, session):
         face_imshow(inv_img_best)
         plt.title('Best Image after inversion.')
         plt.show()
-        print('Predictions: ' + str(inv_img_best_p))
+        print('Best Predictions: ' + str(inv_img_best_p))
 
         face_imshow(inv_img_last)
         plt.title('Last Iteration Image after inversion.')
         plt.show()
-        print('Predictions: ' + str(inv_img_last_p))
+        print('Last Predictions: ' + str(inv_img_last_p))
 
 
 def load(file_name):
@@ -175,7 +206,7 @@ def identity(img_array):
     new_array = np.array(pil_img)
     return new_array
 
-def equalize(img_array):
+def applyEqualization(img_array):
     """
     :param img_array: a 2D numpy array
     :return: numpy array after applying histogram equalization
@@ -185,7 +216,7 @@ def equalize(img_array):
     return np.array(pil_img)
 
 
-def filter(img_array, filter:ImageFilter):
+def applyFilter(img_array, filter:ImageFilter):
     pil_img = Image.fromarray((img_array * 255).astype('uint8'), mode='L')
     pil_img = pil_img.filter(filter)
     return np.array(pil_img)
@@ -202,7 +233,7 @@ def gaussianBlur(img_array, radius:float=2):
     return np.array(pil_img)
 
 
-def medFilter(img_array: np.array, size: int = 3) -> np.array:
+def medianFilter(img_array: np.array, size: int = 3) -> np.array:
     """
     :param img_array: a 2D numpy array
     :param size: window size
@@ -212,11 +243,6 @@ def medFilter(img_array: np.array, size: int = 3) -> np.array:
     pil_img = pil_img.filter(ImageFilter.MedianFilter(size))
     return np.array(pil_img)
 
-
-def sharpenFilter(img_array):
-    pil_img = Image.fromarray((img_array * 255).astype('uint8'), mode='L')
-    pil_img = pil_img.filter(ImageFilter.SHARPEN)
-    return np.array(pil_img)
 
 
 
