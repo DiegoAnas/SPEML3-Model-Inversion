@@ -10,7 +10,7 @@ if __name__ == "__main__":
 
     model = Model(train_x, train_y, test_x, test_y)
     start = time.perf_counter()
-    model.train_sgd(7000)
+    model.train_gd(5000)
     end = time.perf_counter()
     print(f"Training done, {end-start} seconds ellapsed")
     #here a validation set could be tested

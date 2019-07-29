@@ -27,24 +27,33 @@ class Model:
             defining all the nodes 
             """
             # Inputs
-            self.tf_train_dataset = tf.placeholder(tf.float32, shape=(None, num_features))
-            self.tf_train_labels = tf.placeholder(tf.float32, shape=(None, num_labels))
+            self.tf_train_dataset = tf.compat.v1.placeholder(tf.float32, shape=(None, num_features))
+            self.tf_train_labels = tf.compat.v1.placeholder(tf.float32, shape=(None, num_labels))
             # tf_valid_dataset = tf.constant(valid_dataset)
             self.tf_test_dataset = tf.constant(test_data)
 
             # Variables.
             weights = tf.Variable(tf.random.truncated_normal([num_features, num_labels]))
-            biases = tf.Variable(tf.zeros([num_labels]))
+            # biases = tf.Variable(tf.zeros([num_labels]))
+            biases = tf.Variable(tf.constant(0.1, shape=[num_labels]))
             # Output layer  / Training computation. Logits = raw predictions (wo softmax
             logits = tf.matmul(self.tf_train_dataset, weights) + biases
             # loss = cross-entropy
-            self.loss = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits_v2(labels = self.tf_train_labels, logits=logits))
+            self.cross_entropy = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits_v2(labels = self.tf_train_labels, logits=logits))
             # Optimizer.
-            self.optimizer = tf.compat.v1.train.GradientDescentOptimizer(learning_rate).minimize(self.loss)
+            self.optimizer = tf.compat.v1.train.GradientDescentOptimizer(learning_rate).minimize(self.cross_entropy)
 
             # Predictions for the training, and test data.
             self.train_prediction = tf.nn.softmax(logits)
             self.test_prediction = tf.nn.softmax(tf.matmul(self.tf_test_dataset, weights) + biases)
+
+            self.class_inds = tf.argmax(self.train_prediction, 1)  # class predicted
+            class_ind_correct = tf.argmax(self.tf_train_labels, 1)  # true class
+            self.class_prob = (self.train_prediction[0, tf.cast(class_ind_correct[0], tf.int32)])  # Prob predicted of the true class
+            self.loss = tf.subtract(tf.constant(1.0), self.class_prob)  # loss is 1 - prob of true class
+            ###
+
+
 
             # Output predictions
             self.predictions = tf.argmax(logits, 1)
@@ -53,9 +62,10 @@ class Model:
             correct_predictions = tf.equal(tf.argmax(logits, 1), tf.argmax(self.tf_train_labels, 1))
             self.accuracy_measure = tf.reduce_mean(tf.cast(correct_predictions, tf.float32))
 
+            # initializer
             self.sess_init = tf.compat.v1.global_variables_initializer()
 
-        self.session = tf.Session(graph=self.graph)
+        self.session = tf.compat.v1.Session(graph=self.graph)
 
     def test(self, test_x, test_y)-> float:
         return (self.session.run(self.accuracy_measure, feed_dict={self.tf_train_dataset: test_x, self.tf_train_labels: test_y}))
@@ -88,7 +98,7 @@ class Model:
         print("Initialized")
         for step in range(num_steps):
             # pick a randomized offset
-            offset = np.random.randint(0, self.train_labels.shape[0] - self.batch_size - 1)
+            offset = np.random.randint(0, self.train_labels.shape[0] - batch_size - 1)
 
             # Generate a minibatch.
             batch_data = self.train_dataset[offset:(offset + batch_size), :]
@@ -99,7 +109,7 @@ class Model:
                          self.tf_train_labels: batch_labels}
 
             # run one step of computation
-            _, l, predictions = self.session.run([self.optimizer, self.loss, self.train_prediction],
+            _, l, predictions = self.session.run([self.optimizer, self.cross_entropy, self.train_prediction],
                                             feed_dict=feed_dict)
 
             if (step % disp_freq == 0):
