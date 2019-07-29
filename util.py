@@ -158,7 +158,13 @@ def save(file_name, data):
     with open(file_name, 'wb') as f:
         pickle.dump(data, f)
 
+# utility function to calculate accuracy
+def accuracy(predictions, labels):
+    correctly_predicted = np.sum(np.argmax(predictions, 1) == np.argmax(labels, 1))
+    accu = (correctly_predicted) / predictions.shape[0]
+    return accu
 
+#  Pillow library functions for image modificatoins
 def identity(img_array):
     """
     Test function
@@ -168,7 +174,6 @@ def identity(img_array):
     pil_img = Image.fromarray((img_array * 255).astype('uint8'), mode='L')
     new_array = np.array(pil_img)
     return new_array
-
 
 def equalize(img_array):
     """

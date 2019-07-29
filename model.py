@@ -1,65 +1,117 @@
 from sys import stdout
+from typing import List
+
 from util import *
 
 
 class Model:
-    def __init__(self, x, y_):
-        # Softmax regression
-        in_dim = int(x.get_shape()[1])  # 10304 for Face dataset
-        out_dim = int(y_.get_shape()[1])  # 40 for Face dataset
-        self.x = x
-        self.y_ = y_  # placeholders, not data
-        #  original comment:switiching to a simple 2-layer network with relu
-        # But no relu, and only one layer
-        W: tf.Variable = weight_variable([in_dim, out_dim])
-        b: tf.Variable = bias_variable([out_dim])
-        self.y = tf.matmul(x, W) + b  # output layer
+    def __init__(self, train_data, train_labels, test_data, test_labels):
+        # number of features
+        num_features = 10304  # 112 x 92
+        # number of target labels
+        num_labels = 40
+        # learning rate (alpha)
+        learning_rate = 0.1
 
-        # softmax activated output layer
-        self.probabilities = tf.nn.softmax(self.y)
-        self.class_inds = tf.argmax(self.probabilities, 1)  # class indices
+        # input data
+        self.train_dataset = train_data
+        self.train_labels = train_labels
+        self.test_dataset = test_data
+        self.test_labels = test_labels
 
-        # cross_entropy
-        self.cross_entropy = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits_v2(labels=y_, logits=self.y))
-            # Measures the probability error in discrete classification tasks in which the classes are mutually exclusive
+        # initialize a tensorflow graph
+        self.graph = tf.Graph()
 
-        class_ind_correct = tf.argmax(y_, 1)
-        self.class_prob = (self.probabilities[0, tf.cast(class_ind_correct[0], tf.int32)])
-        self.loss = tf.subtract(tf.constant(1.0), self.class_prob)
+        with self.graph.as_default():
+            """ 
+            defining all the nodes 
+            """
+            # Inputs
+            self.tf_train_dataset = tf.placeholder(tf.float32, shape=(None, num_features))
+            self.tf_train_labels = tf.placeholder(tf.float32, shape=(None, num_labels))
+            # tf_valid_dataset = tf.constant(valid_dataset)
+            self.tf_test_dataset = tf.constant(test_data)
 
-        # Gradient descent
-        self.grads = tf.gradients(self.cross_entropy, x)
+            # Variables.
+            weights = tf.Variable(tf.random.truncated_normal([num_features, num_labels]))
+            biases = tf.Variable(tf.zeros([num_labels]))
+            # Output layer  / Training computation. Logits = raw predictions (wo softmax
+            logits = tf.matmul(self.tf_train_dataset, weights) + biases
+            # loss = cross-entropy
+            self.loss = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits_v2(labels = self.tf_train_labels, logits=logits))
+            # Optimizer.
+            self.optimizer = tf.compat.v1.train.GradientDescentOptimizer(learning_rate).minimize(self.loss)
 
-        self.train_step = tf.compat.v1.train.GradientDescentOptimizer(0.1).minimize(self.cross_entropy)
-        # learning rate 0.1, minimize cross entropy
+            # Predictions for the training, and test data.
+            self.train_prediction = tf.nn.softmax(logits)
+            self.test_prediction = tf.nn.softmax(tf.matmul(self.tf_test_dataset, weights) + biases)
 
-        # performance metrics
-        correct_prediction = tf.equal(tf.argmax(self.y, 1), tf.argmax(y_, 1))
-        self.accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
+            # Output predictions
+            self.predictions = tf.argmax(logits, 1)
 
-    def train(self, train_x, train_y, session, test_x, test_y, num_iters:int, disp_freq:int =50):
-        """
-        :param train_x:
-        :param train_y:
-        :param session: tf.session
-        :param test_x: [] : data of testing set
-        :param test_y: [] : labels of testing set
-        :param num_iters:int : number of iterations for training
-        :param disp_freq:int : frequency to display training progress
-        :return:
-        """
-        for i in range(num_iters):
-            feed_dict = {self.x: train_x, self.y_: train_y}
-            session.run(self.train_step, feed_dict)
+            # performance metrics
+            correct_predictions = tf.equal(tf.argmax(logits, 1), tf.argmax(self.tf_train_labels, 1))
+            self.accuracy_measure = tf.reduce_mean(tf.cast(correct_predictions, tf.float32))
+
+            self.sess_init = tf.compat.v1.global_variables_initializer()
+
+        self.session = tf.Session(graph=self.graph)
+
+    def test(self, test_x, test_y)-> float:
+        return (self.session.run(self.accuracy_measure, feed_dict={self.tf_train_dataset: test_x, self.tf_train_labels: test_y}))
+
+    def predict(self, data) -> List[float]:
+        return self.predictions.eval(session=self.session, feed_dict={self.tf_train_dataset: [data]})
+
+    def train_gd(self, epochs, acc_limit=0.9, disp_freq=250):
+        # with self.session as session:
+        # initialize weights and biases
+        self.session.run(self.sess_init)
+        print("Initialized")
+        for i in range(epochs + 1):
+            feed_dict = {self.tf_train_dataset: self.train_dataset,
+                         self.tf_train_labels: self.train_labels}
+            self.session.run(self.optimizer, feed_dict=feed_dict)
             if (i % disp_freq == 0):
-                train_acc = self.test(train_x, train_y, session)
-                test_acc = self.test(test_x, test_y, session)
-                stdout.write("\r Train Acc. : %f    Test Acc. : %f" % (train_acc, test_acc))
-                stdout.flush()
-        stdout.write("\n")
+                train_acc = self.test(self.train_dataset, self.train_labels)
+                test_acc = self.test(self.test_dataset, self.test_labels)
+                print(f"Train Acc. : {train_acc} \t Test Acc. : {test_acc}")
+                if test_acc > acc_limit:
+                    print(f"Reached cutoff at {acc_limit:.3f}; halting after {i} iterations")
+                    break
+        print("\n")
 
-    def test(self, test_x, test_y, session):
-        return (session.run(self.accuracy, feed_dict={self.x: test_x, self.y_: test_y}))
+    def train_sgd(self, num_steps, acc_limit=0.9, disp_freq=500, batch_size = 128):
+        # with self.session as session:
+        # initialize weights and biases
+        self.session.run(self.sess_init)
+        print("Initialized")
+        for step in range(num_steps):
+            # pick a randomized offset
+            offset = np.random.randint(0, self.train_labels.shape[0] - self.batch_size - 1)
+
+            # Generate a minibatch.
+            batch_data = self.train_dataset[offset:(offset + batch_size), :]
+            batch_labels = self.train_labels[offset:(offset + batch_size), :]
+
+            # Prepare the feed dict
+            feed_dict = {self.tf_train_dataset: batch_data,
+                         self.tf_train_labels: batch_labels}
+
+            # run one step of computation
+            _, l, predictions = self.session.run([self.optimizer, self.loss, self.train_prediction],
+                                            feed_dict=feed_dict)
+
+            if (step % disp_freq == 0):
+                print(f"Minibatch loss at step {step}: {l}")
+                print(f"Minibatch accuracy: {accuracy(predictions, batch_labels):.1}")
+                test_acc = self.test(self.test_dataset, self.test_labels)
+                if  test_acc > acc_limit:
+                    print(f"Reached {test_acc:.3f} acc, cutoff at {acc_limit:.3f}; halting after {step} iterations")
+                    break
+
+        print(f"\nTest accuracy: {self.test(self.test_dataset, self.test_labels):.3f}")
+
 
     def invert(self, session, num_iters, lam, img, pre_process, pred_cutoff=0.9999, disp_freq=50):
         """
@@ -105,7 +157,7 @@ class Model:
                 # todo every how many iterations?
                 # todo randomly? apply sharpening and gaussian filters, edge filters?
                 # current_X = sharpenFilter(np.reshape(current_X, (112, 92)))
-                current_X = gaussianBlur(np.reshape(current_X, (112, 92)), 4)
+                current_X = gaussianBlur(np.reshape(current_X, (112, 92)), 8)
                 current_X = equalize(current_X)
                 current_X = np.ndarray.flatten(current_X)
 
@@ -133,17 +185,11 @@ class Model:
         stdout.write("\n")
         print('Loop Escape.')
 
-        current_preds = self.preds(current_X, session)
-        best_preds = self.preds(best_X, session)
+        current_preds = session.run(self.probabilities, feed_dict={self.x: [current_X]})
+        best_preds = session.run(self.probabilities, feed_dict={self.x: [best_X]})
         current_X = post_process(current_X, pre_process, current_X.shape)
         best_X = post_process(best_X, pre_process, best_X.shape)
         return current_X, current_preds, best_X, best_preds
 
-    # todo remove
-    def preds(self, img, session):
-        """
-        :param img: image to get probabilities to which class it belongs
-        :param session: tensorFlow session
-        :return: array of probabilities
-        """
-        return session.run(self.probabilities, feed_dict={self.x: [img]})
+    def close(self):
+        self.session.close()
