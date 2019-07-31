@@ -1,3 +1,5 @@
+import random
+
 import tensorflow as tf
 import numpy as np
 import os
@@ -129,16 +131,16 @@ def post_process(img, prep, img_shape):
     return img.reshape(img_shape)
 
 
-def perform_inversion(model, person_class, option:int, equalize:bool=False):
+def perform_inversion(model, person_class, option:int, equalize:bool=False, filter_freq=1):
     filters = []
     if option == 1:
-        filters.append(ImageFilter.MedianFilter(3))
+        filters.append(ImageFilter.GaussianBlur(2))
         filters.append(ImageFilter.SHARPEN)
     if option == 2:
         filters.append(ImageFilter.BLUR)
         filters.append(ImageFilter.SHARPEN)
     if option == 3:
-        filters.append(ImageFilter.GaussianBlur(5))
+        filters.append(ImageFilter.GaussianBlur(2))
     if option == 4:
         filters.append(ImageFilter.SHARPEN)
     if option == 6:
@@ -146,7 +148,18 @@ def perform_inversion(model, person_class, option:int, equalize:bool=False):
         filters.append(ImageFilter.GaussianBlur(2))
     if option == 5:
         filters.append(ImageFilter.DETAIL)
-    inv_img_last, inv_img_last_p, inv_img_best, inv_img_best_p = model.invert(person_class, filters, equalize)
+    if option == 7:
+        filters.append(ImageFilter.MedianFilter(size=3))
+        filters.append(ImageFilter.SHARPEN)
+    if option == 8:
+        filters.append(ImageFilter.MedianFilter(size=5))
+        filters.append(ImageFilter.SHARPEN)
+    # inv_img_last, inv_img_last_p, inv_img_best, inv_img_best_p =\
+    #     model.invert_by_pixel(person_class, filters, equalize, lambda_=1, epochs=3, iterations=2,
+    #                           filter_freq=filter_freq)
+    inv_img_last, inv_img_last_p, inv_img_best, inv_img_best_p = \
+        model.invert(person_class, filters, equalize, lambda_=0.2, iterations=3000,
+                              filter_freq=filter_freq)
 
     face_imshow(inv_img_best)
     plt.title('Best Image after inversion.')
@@ -157,6 +170,14 @@ def perform_inversion(model, person_class, option:int, equalize:bool=False):
     plt.title('Last Iteration Image after inversion.')
     plt.show()
     print('Last Predictions: ' + str(inv_img_last_p))
+
+    last_shuffle = np.copy(inv_img_last)
+    random.shuffle(last_shuffle)
+    print(f'Last shuffled Predictions: {model.get_probabilities(last_shuffle)}')
+
+    best_shuffle = np.copy(inv_img_best)
+    random.shuffle(best_shuffle)
+    print(f'Last shuffled Predictions: {model.get_probabilities(best_shuffle)}')
 
 
 def perform_inversion2(pre_process, images, model, session):
@@ -203,7 +224,7 @@ def identity(img_array):
     :return: same array after converting it to PIL Image
     """
     pil_img = Image.fromarray((img_array * 255).astype('uint8'), mode='L')
-    new_array = np.array(pil_img)
+    new_array = np.array(pil_img) / 255
     return new_array
 
 def applyEqualization(img_array):
@@ -213,13 +234,13 @@ def applyEqualization(img_array):
     """
     pil_img = Image.fromarray((img_array * 255).astype('uint8'), mode='L')
     pil_img = ImageOps.equalize(pil_img)
-    return np.array(pil_img)
+    return np.array(pil_img)/255
 
 
 def applyFilter(img_array, filter:ImageFilter):
     pil_img = Image.fromarray((img_array * 255).astype('uint8'), mode='L')
     pil_img = pil_img.filter(filter)
-    return np.array(pil_img)
+    return np.array(pil_img)/255
 
 
 def gaussianBlur(img_array, radius:float=2):
@@ -243,6 +264,9 @@ def medianFilter(img_array: np.array, size: int = 3) -> np.array:
     pil_img = pil_img.filter(ImageFilter.MedianFilter(size))
     return np.array(pil_img)
 
+def showPil(img_array, title):
+    pil_img = Image.fromarray((img_array * 255).astype('uint8'), mode='L')
+    pil_img.show(title=title)
 
 
 
