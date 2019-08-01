@@ -1,5 +1,4 @@
 import random
-
 import tensorflow as tf
 import numpy as np
 import os
@@ -157,8 +156,9 @@ def perform_inversion(model, person_class, option:int, equalize:bool=False, filt
     # inv_img_last, inv_img_last_p, inv_img_best, inv_img_best_p =\
     #     model.invert_by_pixel(person_class, filters, equalize, lambda_=1, epochs=3, iterations=2,
     #                           filter_freq=filter_freq)
+
     inv_img_last, inv_img_last_p, inv_img_best, inv_img_best_p = \
-        model.invert(person_class, filters, equalize, lambda_=0.2, iterations=3000,
+        model.invert(person_class, filters, equalize, lambda_=0.2, iterations=5000,
                               filter_freq=filter_freq)
 
     face_imshow(inv_img_best)
@@ -170,14 +170,6 @@ def perform_inversion(model, person_class, option:int, equalize:bool=False, filt
     plt.title('Last Iteration Image after inversion.')
     plt.show()
     print('Last Predictions: ' + str(inv_img_last_p))
-
-    last_shuffle = np.copy(inv_img_last)
-    random.shuffle(last_shuffle)
-    print(f'Last shuffled Predictions: {model.get_probabilities(last_shuffle)}')
-
-    best_shuffle = np.copy(inv_img_best)
-    random.shuffle(best_shuffle)
-    print(f'Last shuffled Predictions: {model.get_probabilities(best_shuffle)}')
 
 
 def perform_inversion2(pre_process, images, model, session):

@@ -1,5 +1,5 @@
 from util import *
-from model import SoftmaxModel
+from model import SoftmaxModel, MLPModel
 
 import time
 import sys
@@ -9,9 +9,9 @@ if __name__ == "__main__":
     #Load dataset
     train_x, test_x, train_y, test_y  = unpack_facedataset() # 7:3 ratio for train:test
 
-    model = SoftmaxModel(train_x, train_y, test_x, test_y)
+    model = MLPModel(train_x, train_y, test_x, test_y)
     start = time.perf_counter()
-    model.train_sgd(1000)
+    model.train_gd(1000)
     end = time.perf_counter()
     print(f"Training done, {end-start} seconds ellapsed")
     #here a validation set could be tested
