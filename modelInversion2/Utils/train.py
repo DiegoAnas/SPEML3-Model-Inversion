@@ -11,6 +11,8 @@ device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
 def train(net, data_loader, test_loader, optimizer, criterion, n_epochs, classes=None, verbose=False):
     losses = []
+    test_accuracies = []
+    train_accuracies = []
     for epoch in range(n_epochs):
         net.train()
         for i, batch in enumerate(data_loader):
@@ -37,8 +39,27 @@ def train(net, data_loader, test_loader, optimizer, criterion, n_epochs, classes
         train_accuracy = eval_target_net(net, data_loader, classes=classes)
         print("Test:")
         test_accuracy = eval_target_net(net, test_loader, classes=classes)
+        train_accuracies.append(train_accuracy)
+        test_accuracies.append(test_accuracy)
+
         plt.plot(losses)
         plt.show()
+
+    fig = plt.figure()
+    ax1 = fig.add_subplot(2, 1, 1)
+    ax2 = fig.add_subplot(2, 1, 2)
+    ax1.plot(list(range(n_epochs)), train_accuracies, label='train_accuracies')
+    ax2.plot(list(range(n_epochs)), test_accuracies, label='test_accuracies')
+
+    ax1.set_xlabel('epoch')
+    ax1.set_ylabel('accuracies')
+    ax1.set_title('train_accuracies')
+    ax1.legend()
+    ax2.set_xlabel('epoch')
+    ax2.set_ylabel('accuracies')
+    ax2.set_title('test_accuracies')
+    ax2.legend()
+    plt.show()
     return train_accuracy, test_accuracy
         
 def train_attacker(attack_net, shadow, shadow_train, shadow_out, optimizer, criterion, n_epochs, k):
