@@ -158,7 +158,7 @@ def perform_inversion(model, person_class, option:int=0, equalize:bool=False, fi
     #                           filter_freq=filter_freq)
 
     inv_img_last, inv_img_last_p, inv_img_best, inv_img_best_p = \
-        model.invert(person_class, filters, equalize, lambda_=1, iterations=10000,
+        model.invert(person_class, filters, equalize, lambda_=0.2, iterations=5000,
                               filter_freq=filter_freq)
 
     face_imshow(inv_img_best)

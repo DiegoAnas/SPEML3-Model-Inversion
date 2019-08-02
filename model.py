@@ -344,8 +344,9 @@ class MLPModel:
 
     def invert(self, person_class, filters=[], equalize=False, lambda_=0.1, iterations=1000, disp_freq=100,
                pred_cutoff=0.9, filter_freq=5):
-        # current_X = np.full(list([10304])[0], 0.5, dtype=float) # 10304 (pixel count)
-        current_X = np.random.rand(10304).astype(np.float32)  # 10304 (pixel count)
+        current_X = np.full(10304, 0.5, dtype=float) # 10304 (pixel count)
+        # current_X = np.random.rand(10304).astype(np.float32)  # 10304 (pixel count)
+        # current_X = np.zeros(10304, dtype=float) # 10304 (pixel count)
         Y = np.zeros([40])  # [40] in {0,1}
         Y[person_class] = 1
         best_X = np.copy(current_X)
@@ -357,16 +358,9 @@ class MLPModel:
         max_gradients= []
         end = False
         best_iteration = 0
-        delta = 0.01
         for i in range(iterations):
             feed_dict = {self.tf_train_dataset: [current_X], self.tf_train_labels: [Y]}
             gradients, current_loss = self.session.run([self.gradients, self.loss], feed_dict)
-            # for pixel in range(self.num_features):
-            #     current_X2 = current_X
-            #     current_X2[pixel] += delta
-            #     feed_dict = {self.tf_train_dataset: [current_X2], self.tf_train_labels: [Y]}
-            #     loss2 = self.session.run(self.loss, feed_dict)
-            #     gradients[pixel] = (loss2 - current_loss ) / delta
             current_X = np.clip(current_X - (lambda_ * (gradients[0][0])), 0.0, 1.0)
             if i < 20:
                 max_gradients.append(max(gradients[0][0]))
@@ -393,6 +387,64 @@ class MLPModel:
             #     break
             if i % disp_freq == 0 and not end:
                 print(f"\n Acc: {probabilities[person_class]} and Loss: {current_loss} and Best Loss: {best_loss}")
+
+        print('Loop Escape.')
+        print(f"Best found at {best_iteration}")
+        current_preds = self.session.run(self.predicted_y, feed_dict={self.tf_train_dataset: [current_X]})
+        best_preds = self.session.run(self.predicted_y, feed_dict={self.tf_train_dataset: [best_X]})
+        print(max_gradients)
+        plt.plot(range(len(max_gradients)), max_gradients, label="Maximum value")
+        plt.xticks(range(len(max_gradients)))
+        plt.xlabel("Iteration")
+        plt.ylabel("Gradient value")
+        plt.show()
+        return current_X, current_preds, best_X, best_preds
+
+    def invert_grads(self, person_class, filters=[], equalize=False, lambda_=0.1, iterations=1000, disp_freq=1,
+               pred_cutoff=0.9, filter_freq=5):
+        # current_X = np.full(list([10304])[0], 0.5, dtype=float) # 10304 (pixel count)
+        current_X = np.random.rand(10304).astype(np.float32)  # 10304 (pixel count)
+        Y = np.zeros([40])  # [40] in {0,1}
+        Y[person_class] = 1
+        best_X = np.copy(current_X)
+        best_prob = 0.0
+        prev_losses = [100000.0] * 100
+        face_imshow(current_X)
+        plt.title('Initial')
+        plt.show()
+        max_gradients= []
+        end = False
+        gradients = np.zeros(10304)
+        best_iteration = 0
+        delta = 0.01
+        for i in range(iterations):
+            feed_dict = {self.tf_train_dataset: [current_X], self.tf_train_labels: [Y]}
+            current_prob = self.session.run(self.predicted_y, feed_dict)[0][person_class]
+            current_X2 = current_X
+            for pixel in range(self.num_features):
+                current_X2[pixel] += delta
+                feed_dict = {self.tf_train_dataset: [current_X2], self.tf_train_labels: [Y]}
+                current_prob2 = self.session.run(self.predicted_y, feed_dict)[0][person_class]
+                gradients[pixel] = (current_prob2 - current_prob ) / delta
+                current_X2[pixel] -= delta
+            current_X = np.clip(current_X + (lambda_ * (gradients)), 0.0, 1.0)
+            if i < 20:
+                max_gradients.append(max(gradients))
+            if (len(filters) > 0 or equalize) and i % filter_freq == filter_freq-1:
+                current_X = np.reshape(current_X, (112, 92))
+                for filter in filters:
+                    current_X = applyFilter(current_X, filter)
+                if equalize:
+                    current_X = applyEqualization(current_X)
+                current_X = np.ndarray.flatten(current_X)
+
+            probabilities = self.session.run(self.predicted_y, feed_dict={self.tf_train_dataset: [current_X]})[0]
+            if current_prob > best_prob:
+                best_prob = current_prob
+                best_X = current_X
+                best_iteration = i
+            if i % disp_freq == 0 and not end:
+                print(f"\n Acc: {probabilities[person_class]} and Loss: {current_prob} and Best Loss: {best_prob}")
 
         print('Loop Escape.')
         print(f"Best found at {best_iteration}")
