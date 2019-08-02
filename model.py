@@ -257,11 +257,12 @@ class MLPModel:
             #     minimize(loss, var_list=[weights_0, weights_1, bias_0, bias_1])
             self.optimizer = tf.compat.v1.train.GradientDescentOptimizer(learning_rate). \
                 minimize(self.loss, var_list=[weights_0, weights_1, bias_0, bias_1])
-            self.gradients = tf.gradients(self.loss, tf.trainable_variables())
+            self.gradients = tf.gradients(self.loss, self.tf_train_dataset)
             # gradient_step = optimizer.compute_gradients
 
             # initializer
             self.sess_init = tf.compat.v1.global_variables_initializer()
+            self.saver = tf.train.Saver()
 
         self.session = tf.compat.v1.Session(graph=self.graph)
 
@@ -279,26 +280,33 @@ class MLPModel:
         # .74 train and test acc
         # with self.session as session:
         # initialize weights and biases
-        self.session.run(self.sess_init)
-        print("Initialized")
-        training_accuracy = []
-        training_loss = []
-        testing_accuracy = []
-        for i in range(epochs):
-            feed_dict = {self.tf_train_dataset: self.train_dataset,
-                         self.tf_train_labels: self.train_labels}
-            _, acc ,cost = self.session.run([self.optimizer, self.accuracy_measure, self.loss], feed_dict=feed_dict)
-            training_accuracy.append(acc)
-            training_loss.append(cost)
-            ## Evaluation of model
-            testing_accuracy.append(self.test(self.test_dataset, self.test_labels))
-            if (i % disp_freq == 0):
-                print(f"Train Acc. : {acc} \t training loss : {cost}")
-                print(f"Testing Acc. : {testing_accuracy[i]} ")
-                # if test_acc > acc_limit:
-                #     print(f"Reached cutoff at {acc_limit:.3f}; halting after {i} iterations")
-                #     break
-        print("\n")
+        try:
+            self.saver.restore(self.session, "./MLPModel.ckpt")
+            print("Model restored.")
+        except:
+            self.session.run(self.sess_init)
+            print("Initialized")
+            training_accuracy = []
+            training_loss = []
+            testing_accuracy = []
+            for i in range(epochs):
+                feed_dict = {self.tf_train_dataset: self.train_dataset,
+                             self.tf_train_labels: self.train_labels}
+                _, acc ,cost = self.session.run([self.optimizer, self.accuracy_measure, self.loss], feed_dict=feed_dict)
+                training_accuracy.append(acc)
+                training_loss.append(cost)
+                ## Evaluation of model
+                testing_accuracy.append(self.test(self.test_dataset, self.test_labels))
+                if (i % disp_freq == 0):
+                    print(f"Train Acc. : {acc} \t training loss : {cost}")
+                    print(f"Testing Acc. : {testing_accuracy[i]} ")
+                    # if test_acc > acc_limit:
+                    #     print(f"Reached cutoff at {acc_limit:.3f}; halting after {i} iterations")
+                    #     break
+            print("\n")
+            save_path = self.saver.save(self.session, "./MLPModel.ckpt")
+            print("Model saved in path: %s" % save_path)
+
 
     def train_sgd(self, epochs, acc_limit=0.9, disp_freq=50, batch_size = 200):
         # with self.session as session:
@@ -334,7 +342,7 @@ class MLPModel:
                 #     break
         print("\n")
 
-    def invert(self, person_class, filters=[], equalize=False, lambda_=0.1, iterations=1000, disp_freq=500,
+    def invert(self, person_class, filters=[], equalize=False, lambda_=0.1, iterations=1000, disp_freq=100,
                pred_cutoff=0.9, filter_freq=5):
         # current_X = np.full(list([10304])[0], 0.5, dtype=float) # 10304 (pixel count)
         current_X = np.random.rand(10304).astype(np.float32)  # 10304 (pixel count)
@@ -349,13 +357,17 @@ class MLPModel:
         max_gradients= []
         end = False
         best_iteration = 0
+        delta = 0.01
         for i in range(iterations):
             feed_dict = {self.tf_train_dataset: [current_X], self.tf_train_labels: [Y]}
             gradients, current_loss = self.session.run([self.gradients, self.loss], feed_dict)
-            j = 0
-            k = 0
-            current_X = np.clip(current_X - (lambda_ * (gradients[j][k])), 0.0, 1.0)
-            # ValueError: operands could not be broadcast together with shapes(10304, )(3000, )
+            # for pixel in range(self.num_features):
+            #     current_X2 = current_X
+            #     current_X2[pixel] += delta
+            #     feed_dict = {self.tf_train_dataset: [current_X2], self.tf_train_labels: [Y]}
+            #     loss2 = self.session.run(self.loss, feed_dict)
+            #     gradients[pixel] = (loss2 - current_loss ) / delta
+            current_X = np.clip(current_X - (lambda_ * (gradients[0][0])), 0.0, 1.0)
             if i < 20:
                 max_gradients.append(max(gradients[0][0]))
             if (len(filters) > 0 or equalize) and i % filter_freq == filter_freq-1:

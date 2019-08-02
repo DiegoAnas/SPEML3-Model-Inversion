@@ -21,13 +21,14 @@ if __name__ == "__main__":
     # face_imshow(test_x[3])
     # plt.title('one pic.')
     # plt.show()
-    option = 0
-    while option != 9:
-        # person = int(input("person (0-39): "))
-        option = int(input("option (9=quit): "))
-        eq = int(input("eq 0/1: ")) == 1
-        fil_freq = int(input("filter freqq : "))
-        perform_inversion(model, 0, option=option, equalize=eq, filter_freq = fil_freq)
+    perform_inversion(model, 0)
+    # option = 0
+    # while option != 9:
+    #     # person = int(input("person (0-39): "))
+    #     option = int(input("option (9=quit): "))
+    #     eq = int(input("eq 0/1: ")) == 1
+    #     fil_freq = int(input("filter freqq : "))
+    #     perform_inversion(model, 0, option=option, equalize=eq, filter_freq = fil_freq)
     # perform_inversion(model, test_x[0])
     model.close()
 

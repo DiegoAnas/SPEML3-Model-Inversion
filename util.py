@@ -130,7 +130,7 @@ def post_process(img, prep, img_shape):
     return img.reshape(img_shape)
 
 
-def perform_inversion(model, person_class, option:int, equalize:bool=False, filter_freq=1):
+def perform_inversion(model, person_class, option:int=0, equalize:bool=False, filter_freq=1):
     filters = []
     if option == 1:
         filters.append(ImageFilter.GaussianBlur(2))
@@ -158,7 +158,7 @@ def perform_inversion(model, person_class, option:int, equalize:bool=False, filt
     #                           filter_freq=filter_freq)
 
     inv_img_last, inv_img_last_p, inv_img_best, inv_img_best_p = \
-        model.invert(person_class, filters, equalize, lambda_=0.2, iterations=5000,
+        model.invert(person_class, filters, equalize, lambda_=1, iterations=10000,
                               filter_freq=filter_freq)
 
     face_imshow(inv_img_best)
